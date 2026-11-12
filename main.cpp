@@ -522,6 +522,74 @@ Points Plot::append(const p_t p) const
   return Points(tmp);
 }
 
+struct Mtxs {
+  size_t k;
+  Mtx* mtxs;
+
+  Mtxs():
+    k(0),mtxs(nullptr)
+  {}
+
+  Mtxs(size_t k):
+    k(k),mtxs(new Mtx[k])
+  {}
+
+  Mtxs(const Mtxs& rhs):
+    k(rhs.k), mtxs(new Mtx[rhs.k])
+  {
+    try {
+      for (size_t i = 0; i < k; ++i) {
+       mtxs[i] = rhs.mtxs[i];
+      }
+    }
+    catch (...) {
+      delete [] mtxs;
+      throw;
+    }
+  }
+
+  Mtxs(Mtxs&& rhs) noexcept:
+    k(rhs.k), mtxs(rhs.mtxs)
+  {
+    rhs.k = 0;
+    rhs.mtxs = nullptr;
+  }
+
+  Mtxs& operator=(const Mtxs& rhs)
+  {
+    if (this == &rhs){
+      return *this;
+    }
+
+    Mtxs temp(rhs);
+
+    std::swap(k,temp.k);
+    std::swap(mtxs, temp.mtxs);
+
+    return *this;
+  }
+
+  Mtxs& operator=(Mtxs&& rhs) noexcept
+  {
+    if (this != &rhs){
+      delete[] mtxs;
+
+      k = rhs.k;
+      mtxs = rhs.mtxs;
+
+      rhs.k = 0;
+      rhs.mtxs = nullptr;
+    }
+
+    return *this;
+  }
+
+  ~Mtxs()
+  {
+    delete[] mtxs;
+  }
+  };
+
 int main()
 {
   int arr[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
