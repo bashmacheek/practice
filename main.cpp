@@ -223,6 +223,10 @@ public:
   Mtx();
   Mtx(size_t m, size_t n);
   Mtx(size_t m, size_t n, const Ints & data);
+  Mtx(const Mtx & rhs) = default;
+  Mtx(Mtx && rhs) noexcept = default;
+  Mtx & operator=(const Mtx & rhs) = default;
+  Mtx & operator=(Mtx && rhs) noexcept = default;
   ~Mtx() = default;
 
   Mtx sum(Mtx const & rhs) const;
@@ -235,6 +239,7 @@ public:
 
   Mtx transpose() const;
   int det() const;
+  bool equals(const Mtx & rhs) const;
 };
 
 Mtx::Mtx():
@@ -405,6 +410,19 @@ int Mtx::det() const
     res = static_cast< int >(next);
   }
   return res;
+}
+
+bool Mtx::equals(const Mtx & rhs) const
+{
+  if (m != rhs.m || n != rhs.n) {
+    return false;
+  }
+  for (size_t i = 0; i < data_mtx.getSize(); i++) {
+    if (data_mtx.get(i) != rhs.data_mtx.get(i)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 class Points {
@@ -584,17 +602,218 @@ struct Mtxs {
     return *this;
   }
 
+  Mtx & operator[](size_t id)
+  {
+    if (id >= k) {
+      throw std::logic_error("Out of range");
+    }
+    return mtxs[id];
+  }
+
+  const Mtx & operator[](size_t id) const
+  {
+    if (id >= k) {
+      throw std::logic_error("Out of range");
+    }
+    return mtxs[id];
+  }
+
+  Mtxs erase() const
+  {
+    if (k == 0) {
+      throw std::logic_error("Empty array");
+    }
+    return erase(k - 1);
+  }
+
+  Mtxs erase(size_t id) const
+  {
+    if (id >= k) {
+      throw std::logic_error("Out of range");
+    }
+    return erase(id, id + 1);
+  }
+
+  Mtxs erase(size_t first, size_t last) const
+  {
+    if (first > last || last > k) {
+      throw std::logic_error("Out of range");
+    }
+    Mtxs result(k - (last - first));
+    size_t p = 0;
+    for (size_t i = 0; i < k; i++) {
+      if (i < first || i >= last) {
+        result.mtxs[p++] = mtxs[i];
+      }
+    }
+    return result;
+  }
+
+  Mtxs erase(const Mtx & value) const
+  {
+    size_t count = 0;
+    for (size_t i = 0; i < k; i++) {
+      if (!mtxs[i].equals(value)) {
+        count++;
+      }
+    }
+    Mtxs result(count);
+    size_t p = 0;
+    for (size_t i = 0; i < k; i++) {
+      if (!mtxs[i].equals(value)) {
+        result.mtxs[p++] = mtxs[i];
+      }
+    }
+    return result;
+  }
+
+  Mtxs insert(size_t id, const Mtx & value) const
+  {
+    if (id > k) {
+      throw std::logic_error("Out of range");
+    }
+    if (k == std::numeric_limits< size_t >::max()) {
+      throw std::logic_error("Overflow");
+    }
+    Mtxs result(k + 1);
+    for (size_t i = 0; i < id; i++) {
+      result.mtxs[i] = mtxs[i];
+    }
+    result.mtxs[id] = value;
+    for (size_t i = id; i < k; i++) {
+      result.mtxs[i + 1] = mtxs[i];
+    }
+    return result;
+  }
+
+  Mtxs insert(size_t id, const Mtxs & values) const
+  {
+    if (id > k) {
+      throw std::logic_error("Out of range");
+    }
+    if (values.k > std::numeric_limits< size_t >::max() - k) {
+      throw std::logic_error("Overflow");
+    }
+    Mtxs result(k + values.k);
+    for (size_t i = 0; i < id; i++) {
+      result.mtxs[i] = mtxs[i];
+    }
+    for (size_t i = 0; i < values.k; i++) {
+      result.mtxs[id + i] = values.mtxs[i];
+    }
+    for (size_t i = id; i < k; i++) {
+      result.mtxs[values.k + i] = mtxs[i];
+    }
+    return result;
+  }
+
+  Mtxs insert(const Mtx & value) const
+  {
+    return insert(k, value);
+  }
+
+  Mtxs operator+(const Mtxs & rhs) const
+  {
+    if (rhs.k > std::numeric_limits< size_t >::max() - k) {
+      throw std::logic_error("Overflow");
+    }
+    Mtxs result(k + rhs.k);
+    for (size_t i = 0; i < k; i++) {
+      result.mtxs[i] = mtxs[i];
+    }
+    for (size_t i = 0; i < rhs.k; i++) {
+      result.mtxs[k + i] = rhs.mtxs[i];
+    }
+    return result;
+  }
+
+  Mtxs operator+(Mtxs && rhs) const
+  {
+    if (rhs.k > std::numeric_limits< size_t >::max() - k) {
+      throw std::logic_error("Overflow");
+    }
+    Mtxs result(k + rhs.k);
+    for (size_t i = 0; i < k; i++) {
+      result.mtxs[i] = mtxs[i];
+    }
+    for (size_t i = 0; i < rhs.k; i++) {
+      result.mtxs[k + i] = std::move(rhs.mtxs[i]);
+    }
+    return result;
+  }
+
+  Mtxs operator|(const Mtxs & rhs) const
+  {
+    Mtxs combined = *this + rhs;
+    size_t count = 0;
+    for (size_t i = 0; i < combined.k; i++) {
+      bool found = false;
+      for (size_t j = 0; j < i; j++) {
+        if (combined.mtxs[i].equals(combined.mtxs[j])) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        count++;
+      }
+    }
+
+    Mtxs result(count);
+    size_t p = 0;
+    for (size_t i = 0; i < combined.k; i++) {
+      bool found = false;
+      for (size_t j = 0; j < i; j++) {
+        if (combined.mtxs[i].equals(combined.mtxs[j])) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        result.mtxs[p++] = combined.mtxs[i];
+      }
+    }
+    return result;
+  }
+
   ~Mtxs()
   {
-    delete[] mtxs;
+    delete [] mtxs;
   }
-  };
+};
+
+Mtx conv(Mtxs m, Mtx (*f)(Mtx, Mtx))
+{
+  if (m.k == 0) {
+    throw std::invalid_argument("Empty matrices");
+  }
+  if (f == nullptr) {
+    throw std::invalid_argument("Null function");
+  }
+
+  Mtx result = m.mtxs[0];
+  for (size_t i = 1; i < m.k; i++) {
+    result = f(result, m.mtxs[i]);
+  }
+  return result;
+}
+
+Mtx sumMtx(Mtx a, Mtx b)
+{
+  return a.sum(b);
+}
 
 int main()
 {
   int arr[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
   Ints a(arr, 9);
   Mtx mtx1(3, 3, a);
+
+  Mtxs matrices(2);
+  matrices[0] = mtx1;
+  matrices[1] = mtx1;
+  Mtx result = conv(matrices, sumMtx);
+  (void)result;
 
   return 0;
 }
