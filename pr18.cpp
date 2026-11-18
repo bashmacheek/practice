@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdexcept>
 
 namespace
 {
@@ -129,6 +130,84 @@ namespace
     Color cl_;
   };
 
+  class Circle: public Planar
+  {
+  public:
+    Circle(Point center, int r):
+      center_(center),
+      r_(r)
+    {
+      if (r < 0)
+      {
+        throw std::invalid_argument("Negative radius");
+      }
+    }
+    virtual ~Circle() = default;
+
+    virtual std::ostream& info(std::ostream& out) override
+    {
+      return out << "Circle";
+    }
+    virtual int x() const override
+    {
+      return center_.x();
+    }
+    virtual int y() const override
+    {
+      return center_.y();
+    }
+    virtual int abs_sqr() const override
+    {
+      return center_.abs_sqr();
+    }
+
+    double sqr() const
+    {
+      const double pi = 3.141592653589793;
+      return pi * r_ * r_;
+    }
+    void move(Point p)
+    {
+      center_ = p;
+    }
+    void resize(int r)
+    {
+      if (r < 0)
+      {
+        throw std::invalid_argument("Negative radius");
+      }
+      r_ = r;
+    }
+  private:
+    Point center_;
+    int r_;
+  };
+
+  class ColoredCircle: public Circle, public Colored
+  {
+  public:
+    ColoredCircle(Point center, int r, Color color):
+      Circle(center, r),
+      cl_(color)
+    {}
+    virtual ~ColoredCircle() = default;
+
+    virtual std::ostream& info(std::ostream& out) override
+    {
+      return out << "Colored circle";
+    }
+    virtual Color getColor() const override
+    {
+      return cl_;
+    }
+    virtual void setColor(Color color) override
+    {
+      cl_ = color;
+    }
+  private:
+    Color cl_;
+  };
+
   class Brush: public Colored
   {
   public:
@@ -165,7 +244,7 @@ void del(Planar* pls[], size_t size)
 
 int main()
 {
-  const size_t cap = 6;
+  const size_t cap = 8;
   Planar* pls[cap];
   size_t size = 0;
   try
@@ -176,11 +255,25 @@ int main()
     pls[size++] = new Vector(Point(3, 4), Point(1, 2));
     pls[size++] = new ColoredPoint(Point(1, 2), Color::RED);
     pls[size++] = new ColoredPoint(Point(3, 4), Color::GREEN);
+
+    Circle* circle = new Circle(Point(2, 3), 4);
+    pls[size++] = circle;
+    circle->move(Point(5, 6));
+    circle->resize(3);
+    std::cout << "Circle area: " << circle->sqr() << '\n';
+
+    ColoredCircle* colored_circle = new ColoredCircle(Point(1, 1), 2, Color::BLUE);
+    pls[size++] = colored_circle;
+    colored_circle->move(Point(3, 4));
+    colored_circle->resize(5);
+    colored_circle->setColor(Color::RED);
+    std::cout << "Colored circle area: " << colored_circle->sqr() << '\n';
   }
   catch (const std::exception& e)
   {
     del(pls, size);
     std::cerr << e.what() << '\n';
+    return 1;
   }
 
   for (size_t i = 0; i < size; i++)
